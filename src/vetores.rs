@@ -13,21 +13,6 @@ pub trait Vetor {
     fn e_maior(self:&Self, other: &Self) -> bool;
 }
 
-fn _teste_vetor<T:Vetor>(_vetor:T) {
-    let mut v: T = T::novo();
-    for i in 0..10 {
-        v.colocar(10*i);
-        for j in 0..i {
-            assert!(v.ler(j)==10*j);
-        }
-    }
-    for k in 9..=1 {
-        assert!(v.pegar()==10*k)
-    }
-    let u: T = T::novo();
-    assert!(v.e_maior(&u));
-    println!("Testes OK")
-}
 
 #[derive(Debug)]
 pub struct VetorOn {
@@ -282,12 +267,29 @@ fn _tempo_operacoes_vetor<T:Vetor>(n:i32, _vetor:T) {
     println!("Colocar:\t{t_colocar_media:.1} ns \t{t_colocar_max} ns");
 
 }
+#[test]
+fn teste_vetor() {
+    _teste_vetor_generico(VetorO1::novo());
+    _teste_vetor_generico(VetorOn::novo());
+}
+fn _teste_vetor_generico<T:Vetor>(_vetor:T) {
+    let mut v: T = T::novo();
+    for i in 0..10 {
+        v.colocar(10*i);
+        for j in 0..i {
+            assert!(v.ler(j)==10*j);
+        }
+    }
+    for k in 9..=1 {
+        assert!(v.pegar()==10*k)
+    }
+    let u: T = T::novo();
+    assert!(v.e_maior(&u));
+    println!("Testes OK")
+}
 
 
-pub fn vetor_main() {
-    println!("Começo");
-    _teste_vetor(VetorO1::novo());
-    _teste_vetor(VetorOn::novo());
+fn _vetor_main() {
     println!("\nVetor O(n)");
     _tempo_operacoes_vetor(10000, VetorOn::novo());
     _tempo_operacoes_vetor(100000, VetorOn::novo());

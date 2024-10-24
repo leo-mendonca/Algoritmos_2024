@@ -1,12 +1,12 @@
 use std::alloc::{alloc, dealloc, Layout};
-use std::fmt::{Display, Formatter};
+use std::fmt::{format, Display, Formatter};
 use std::ptr::write;
 
-struct CelulaSimples<T> {
+pub struct CelulaSimples<T> {
     conteudo: T,
     proximo: *mut CelulaSimples<T>,
 }
-struct CelulaDupla<T> {
+pub struct CelulaDupla<T> {
     conteudo: T,
     proximo: *mut CelulaDupla<T>,
     anterior: *mut CelulaDupla<T>,
@@ -426,15 +426,20 @@ impl<T:Display> Display for ListaDupla<T> {
 }
 
 
-
+#[test]
 fn _teste_bom_dia() {
     let mut lista:ListaEncadeada<char>=ListaEncadeada::novo();
     println!("Início");
     let mensagem: &str ="Bom dia!";
+    let mut mensagem_fila = mensagem.chars();
+    let mut letra_correta:char;
     for letra in mensagem.chars() {
         lista.colocar(letra);
         println!("{}",letra);
+        letra_correta=mensagem_fila.next().unwrap();
+        assert_eq!(letra_correta, letra);
     }
+    assert_eq!("Bom dia!", format!("{}",lista));
     println!("Escrevi\nLendo:");
     let mut endereco: *mut CelulaSimples<char> = lista.cabeca;
     let conteudo: char;
@@ -447,24 +452,27 @@ fn _teste_bom_dia() {
         print!("{}",conteudo);
         if conteudo=='m' { pos_inserir =endereco }
     }
-    // endereco=lista.cabeca;
     lista.inserir_apos(pos_inserir, 's');
     println!("\nTerminei de inserir");
-    lista.imprimir_lista();
+    println!("{}",lista);
+    assert_eq!("Boms dia!", format!("{}",lista));
     println!("Inserindo exclamação!");
     let (_c, pos_apos) = lista.proxima_mut(pos_inserir);
     lista.alterar(pos_apos, '!');
-    lista.imprimir_lista();
+    println!("{}",lista);
+    assert_eq!("Bom! dia!", format!("{}",lista));
     println!("Removendo exclamação!");
     lista.deletar_apos(pos_inserir);
-    lista.imprimir_lista();
+    println!("{}",lista);
+    assert_eq!("Bom dia!", format!("{}",lista));
     println!("Removendo a primeira palavra");
     for _i in 1..=4 {
         lista.deletar_cabeca();
     }
-    lista.imprimir_lista();
+    println!("{}",lista);
+    assert_eq!("dia!", format!("{}",lista));
 }
-
+#[test]
 fn _teste_numerico() {
     println!("Iniciando teste com dados numéricos e iterador");
     let numeros: [i32; 5] = [10, 20, 30, 40, 50];
@@ -472,10 +480,14 @@ fn _teste_numerico() {
     for n in numeros {
         lista.colocar(n) }
     for elem in lista.into_iter() {
-        println!("{}",elem);
+        println!("{},",elem);
     }
-    lista.imprimir_lista();
+    println!("{}",lista);
+    let s = String::from("10,20,30,40,50,");
+    // let str_lista = String::from(lista);
+    assert_eq!(s, format!("{}",lista));
 }
+#[test]
 fn _teste_lista_dupla(){
     let mut lista: ListaDupla<char> = ListaDupla::novo();
     let mensagem: &str ="Palavra";
@@ -483,6 +495,7 @@ fn _teste_lista_dupla(){
         lista.colocar(letra);
         print!("{}",letra);
     }
+    assert_eq!(format!("{}",lista), "Palavra");
     let mut endereco: *mut CelulaDupla<char> = lista.ponta;
     println!("\nInserindo exclamações entre as letras");
     for _i in 1..mensagem.len() {
@@ -491,10 +504,11 @@ fn _teste_lista_dupla(){
         let (_c, end) = lista.anterior(end);
         endereco=end;
     }
-    lista.imprimir_lista();
+    println!("{}",lista);
+    assert_eq!(format!("{}",lista), "P!a!l!a!v!r!a");
 }
-fn _main() {
-    _teste_bom_dia();
-    _teste_numerico();
-    _teste_lista_dupla();
-}
+// pub fn lista_main() {
+//     _teste_bom_dia();
+//     _teste_numerico();
+//     _teste_lista_dupla();
+// }
