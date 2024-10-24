@@ -4,12 +4,13 @@ use std::ptr::write;
 
 pub struct CelulaSimples<T> {
     conteudo: T,
-    proximo: *mut CelulaSimples<T>,
+    // proximo: *mut CelulaSimples<T>,
+    proximo: Option<*mut CelulaSimples<T>>,
 }
 pub struct CelulaDupla<T> {
     conteudo: T,
-    proximo: *mut CelulaDupla<T>,
-    anterior: *mut CelulaDupla<T>,
+    proximo: Option<*mut CelulaDupla<T>>,
+    anterior: Option<*mut CelulaDupla<T>>,
 }
 
 pub struct ListaEncadeada<T> {
@@ -33,7 +34,7 @@ impl<T> ListaEncadeada<T> {
     pub fn colocar(self: &mut Self,elemento: T) {
         let nova_celula: CelulaSimples<T> = CelulaSimples {
             conteudo: elemento,
-            proximo: self.cabeca,
+            proximo: None,
         };
         if self.n==0 {
             unsafe {self.cabeca.write(nova_celula)};
@@ -43,7 +44,7 @@ impl<T> ListaEncadeada<T> {
             let layout:Layout = Layout::new::<CelulaSimples<T>>();
             let ponteiro: *mut CelulaSimples<T>  = unsafe {alloc(layout) as *mut CelulaSimples<T>};
             let mut penultima_celula = unsafe { self.ponta.read() };
-            penultima_celula.proximo = ponteiro;
+            penultima_celula.proximo = Some(ponteiro);
             unsafe { self.ponta.write(penultima_celula) };
             unsafe { ponteiro.write(nova_celula) };
             self.ponta = ponteiro;
@@ -62,39 +63,51 @@ impl<T> ListaEncadeada<T> {
         unsafe { //modificando o apontador da celula anterior para apontar para a celula inserida
             let apontador_novo:*mut CelulaSimples<T> =alloc(layout) as *mut CelulaSimples<T>;
             apontador_novo.write(celula_nova);
-            celula_anterior.proximo = apontador_novo;
+            celula_anterior.proximo = Some(apontador_novo);
             endereco.write(celula_anterior);
         };
         self.n+=1;
     }
-    fn proxima_mut(self:&mut Self, endereco: *mut CelulaSimples<T>) -> (T, *mut CelulaSimples<T>) {
+    fn proxima_mut(self:&mut Self, endereco: *mut CelulaSimples<T>) -> Option<(T, *mut CelulaSimples<T>)> {
         if endereco==self.ponta {
             panic!()
         }
         unsafe {
             let celula_atual: CelulaSimples<T> =  {endereco.read()};
-            let end_prox:*mut CelulaSimples<T> = celula_atual.proximo;
-            let proxima_celula: CelulaSimples<T> =  {end_prox.read()};
-            (proxima_celula.conteudo, (end_prox))
+            match celula_atual.proximo {
+                None => {None}
+                Some(ponteiro) => {
+                    let proxima_celula: CelulaSimples<T> =  {ponteiro.read()};
+                    Some((proxima_celula.conteudo, ponteiro))
+                }
+            }
+
         }
     }
-    fn proxima(self:&Self, endereco: *const CelulaSimples<T>) -> (T, *const CelulaSimples<T>) {
-        if endereco==self.ponta {
+    fn proxima(self:&Self, endereco: *const CelulaSimples<T>) -> Option<(T, *const CelulaSimples<T>)> {
+        if endereco == self.ponta {
             panic!()
         }
         unsafe {
-            let celula_atual: CelulaSimples<T> =  {endereco.read()};
-            let end_prox:*const CelulaSimples<T> = celula_atual.proximo;
-            let proxima_celula: CelulaSimples<T> =  {end_prox.read()};
-            (proxima_celula.conteudo, (end_prox))
+            let celula_atual: CelulaSimples<T> = { endereco.read() };
+            match celula_atual.proximo {
+                None => { None }
+                Some(ponteiro) => {
+                    let proxima_celula: CelulaSimples<T> = { ponteiro.read() };
+                    Some((proxima_celula.conteudo, ponteiro))
+                }
+            }
         }
     }
-    fn ler_cabeca(self: &Self) ->(T,*const CelulaSimples<T>) {
+    fn ler_cabeca(self: &Self) ->Option<(T,*const CelulaSimples<T>)> {
         let celula: CelulaSimples<T> = unsafe {self.cabeca.read()};
         let conteudo: T = celula.conteudo;
-        let apontador: *const CelulaSimples<T> = celula.proximo;
-        (conteudo, apontador)
+        match celula.proximo {
+        Some(apontador) => Some((conteudo,apontador)),
+        None => None,
+        }
     }
+
     pub fn alterar(self: &Self, endereco: *mut CelulaSimples<T>, conteudo: T) {
         let mut celula = unsafe {endereco.read()};
         celula.conteudo=conteudo;
@@ -104,7 +117,7 @@ impl<T> ListaEncadeada<T> {
         assert!(endereco!=self.ponta);
         //Deleta a celula seguinte àquela do endereço fornecido
         let mut celula_anterior: CelulaSimples<T> = unsafe {endereco.read()};
-        let ponteiro_remover:*mut CelulaSimples<T> = celula_anterior.proximo;
+        let ponteiro_remover:*mut CelulaSimples<T> = celula_anterior.proximo.expect("O ponteiro da celula não deve ser None, pois ela não pode ser a ponta!");
         let celula_a_remover: CelulaSimples<T> = unsafe {ponteiro_remover.read()};
         //Alterando o apontador da célula anterior para "pular" a célula deletada
         celula_anterior.proximo = celula_a_remover.proximo.clone();
@@ -120,7 +133,7 @@ impl<T> ListaEncadeada<T> {
         assert!(self.n>0);
         let cabeca_atual=self.cabeca;
         let celula_cabeca = unsafe {cabeca_atual.read()};
-        self.cabeca = celula_cabeca.proximo.clone();
+        self.cabeca = celula_cabeca.proximo.expect("O apontador da nova cabeça não pode ser None, pois a lista não é vazia");
         let layout_remover: Layout = Layout::new::<CelulaSimples<T>>();
         unsafe { dealloc(cabeca_atual as *mut u8, layout_remover) };
         self.n-=1;
@@ -147,10 +160,11 @@ impl<T> ListaDupla<T> {
         }
     }
     pub fn colocar(self: &mut Self,elemento: T) {
+        //Insere um elemento na ponta da lista
         let nova_celula: CelulaDupla<T> = CelulaDupla {
             conteudo: elemento,
-            proximo: self.cabeca.clone(),
-            anterior: self.ponta.clone(),
+            proximo: None,
+            anterior: Some(self.ponta.clone()),
         };
         if self.n==0 {
             unsafe {self.cabeca.write(nova_celula)};
@@ -159,7 +173,7 @@ impl<T> ListaDupla<T> {
             let layout:Layout = Layout::new::<CelulaDupla<T>>();
             let ponteiro: *mut CelulaDupla<T>  = unsafe {alloc(layout) as *mut CelulaDupla<T>};
             let mut penultima_celula = unsafe { self.ponta.read() };
-            penultima_celula.proximo = ponteiro;
+            penultima_celula.proximo = Some(ponteiro);
             unsafe { self.ponta.write(penultima_celula) };
             unsafe { ponteiro.write(nova_celula) };
             self.ponta = ponteiro;
@@ -170,33 +184,44 @@ impl<T> ListaDupla<T> {
         //Insere o caractere 'conteudo' na celula imediatamente apos a celula que esta em 'endereco'
         //Identificando a celula atual (que sera a anterior à nova):
         let mut celula_anterior:CelulaDupla<T> = unsafe {endereco.read()};
-        let end_seguinte: *mut CelulaDupla<T> = celula_anterior.proximo;
-        let mut celula_seguinte: CelulaDupla<T> = unsafe { end_seguinte.read()};
+        let end_seguinte: Option<*mut CelulaDupla<T>> = celula_anterior.proximo;
+
+        let mut celula_seguinte: Option<CelulaDupla<T>> = match end_seguinte{
+            Some(ponteiro) =>Some(unsafe { ponteiro.read() }),
+            None => None,
+        };
         let celula_nova: CelulaDupla<T> = CelulaDupla {
             conteudo: conteudo,
             proximo: end_seguinte.clone(),
-            anterior: endereco.clone(),
+            anterior: Some(endereco.clone()),
         };
         let layout:Layout = Layout::new::<CelulaDupla<T>>();
-        unsafe { //modificando os apontadores da celula anterior e da seguinte para apontar para a celula inserida
+        let apontador_novo = unsafe { //modificando os apontadores da celula anterior e da seguinte para apontar para a celula inserida
             let apontador_novo:*mut CelulaDupla<T> =alloc(layout) as *mut CelulaDupla<T>;
             apontador_novo.write(celula_nova);
-            celula_anterior.proximo = apontador_novo;
-            celula_seguinte.anterior = apontador_novo;
+            celula_anterior.proximo = Some(apontador_novo);
             endereco.write(celula_anterior);
-            end_seguinte.write(celula_seguinte);
+            match celula_seguinte {
+                Some(mut celula) => {
+                    celula.anterior = Some(apontador_novo);
+                    end_seguinte.expect("Sabemos que é um ponteiro").write(celula);
+                },
+                None => {},
+            }
+            apontador_novo
         };
-        if endereco==self.ponta {self.ponta = end_seguinte}
+        if endereco==self.ponta {self.ponta = apontador_novo}
         self.n+=1;
     }
     pub fn inserir_antes(self: &mut Self,endereco: *mut CelulaDupla<T>, conteudo: T) {
-        match endereco==self.cabeca {
-            true => {self.inserir_cabeca(conteudo)},
-            false => {
-                let celula: CelulaDupla<T> = unsafe {endereco.read()};
-                self.inserir_apos(celula.anterior, conteudo);
-            }
+        if endereco==self.cabeca  {
+            self.inserir_cabeca(conteudo)
         }
+        else {
+            let celula: CelulaDupla<T> = unsafe {endereco.read()};
+            self.inserir_apos(celula.anterior.expect("A célula anterior não é vazia, pois o endereço que foi passado não é a cabeça"), conteudo);
+        }
+
     }
     fn inserir_cabeca(self: &mut Self, conteudo: T) {
         let cabeca_atual: *mut CelulaDupla<T> = self.cabeca.clone();
@@ -205,10 +230,10 @@ impl<T> ListaDupla<T> {
         let nova_cabeca: *mut CelulaDupla<T> = unsafe {alloc(layout) as *mut CelulaDupla<T>};
         let nova_celula: CelulaDupla<T> = CelulaDupla {
             conteudo: conteudo,
-            anterior: nova_cabeca,
-            proximo: cabeca_atual,
+            anterior: None,
+            proximo: Some(cabeca_atual),
         };
-        celula_atual.anterior=nova_cabeca;
+        celula_atual.anterior=Some(nova_cabeca);
         unsafe {
             cabeca_atual.write(celula_atual);
             nova_cabeca.write(nova_celula);
@@ -216,33 +241,47 @@ impl<T> ListaDupla<T> {
         self.cabeca=nova_cabeca;
         self.n+=1;
     }
-    fn proxima_mut(self:&mut Self, endereco: *mut CelulaDupla<T>) -> (T, *mut CelulaDupla<T>) {
-        if endereco==self.ponta {
+    fn proxima_mut(self:&mut Self, endereco: *mut CelulaDupla<T>) -> Option<(T, *mut CelulaDupla<T>)>{
+        // if endereco == self.ponta {
+        //     panic!()
+        // }
+        // unsafe {
+        //     let celula_atual: CelulaDupla<T> = { endereco.read() };
+        //     match celula_atual.proximo {
+        //         None => { None }
+        //         Some(ponteiro) => {
+        //             let proxima_celula: CelulaDupla<T> = { ponteiro.read() };
+        //             Some((proxima_celula.conteudo, ponteiro))
+        //         }
+        //     }
+        // }
+        match self.proxima(endereco as *const CelulaDupla<T>) {
+            None =>None,
+            Some((conteudo, ponteiro)) => Some((conteudo, ponteiro as *mut CelulaDupla<T>))
+        }
+    }
+    fn proxima(self:&Self, endereco: *const CelulaDupla<T>) -> Option<(T, *const CelulaDupla<T>)> {
+        if endereco == self.ponta {
             panic!()
         }
         unsafe {
-            let celula_atual: CelulaDupla<T> =  {endereco.read()};
-            let end_prox:*mut CelulaDupla<T> = celula_atual.proximo;
-            let proxima_celula: CelulaDupla<T> =  {end_prox.read()};
-            (proxima_celula.conteudo, (end_prox))
+            let celula_atual: CelulaDupla<T> = { endereco.read() };
+            match celula_atual.proximo {
+                None => { None }
+                Some(ponteiro) => {
+                    let proxima_celula: CelulaDupla<T> = { ponteiro.read() };
+                    Some((proxima_celula.conteudo, ponteiro))
+                }
+            }
         }
     }
-    fn proxima(self:&Self, endereco: *const CelulaDupla<T>) -> (T, *const CelulaDupla<T>) {
-        if endereco==self.ponta {
-            panic!()
-        }
-        unsafe {
-            let celula_atual: CelulaDupla<T> =  {endereco.read()};
-            let end_prox:*const CelulaDupla<T> = celula_atual.proximo;
-            let proxima_celula: CelulaDupla<T> =  {end_prox.read()};
-            (proxima_celula.conteudo, (end_prox))
-        }
-    }
-    fn ler_cabeca(self: &Self) ->(T,*const CelulaDupla<T>) {
+    fn ler_cabeca(self: &Self) ->Option<(T,*const CelulaDupla<T>)> {
         let celula: CelulaDupla<T> = unsafe {self.cabeca.read()};
         let conteudo: T = celula.conteudo;
-        let apontador: *const CelulaDupla<T> = celula.proximo;
-        (conteudo, apontador)
+        match celula.proximo {
+            Some(apontador) => Some((conteudo,apontador)),
+            None => None,
+        }
     }
     pub fn alterar(self: &Self, endereco: *mut CelulaDupla<T>, conteudo: T) {
         let mut celula = unsafe {endereco.read()};
@@ -253,7 +292,7 @@ impl<T> ListaDupla<T> {
         assert!(endereco!=self.ponta);
         //Deleta a celula seguinte àquela do endereço fornecido
         let mut celula_anterior: CelulaDupla<T> = unsafe {endereco.read()};
-        let ponteiro_remover:*mut CelulaDupla<T> = celula_anterior.proximo;
+        let ponteiro_remover:*mut CelulaDupla<T> = celula_anterior.proximo.expect("A célula passada não deve ser a ponta!");
         let celula_a_remover: CelulaDupla<T> = unsafe {ponteiro_remover.read()};
         //Alterando o apontador da célula anterior para "pular" a célula deletada
         celula_anterior.proximo = celula_a_remover.proximo.clone();
@@ -264,9 +303,10 @@ impl<T> ListaDupla<T> {
         //Se a célula removida for a ponta da lista, a célula anterior vira a nova ponta:
         if ponteiro_remover==self.ponta {self.ponta = endereco}
         else  {
-            let mut celula_seguinte: CelulaDupla<T> = unsafe { celula_a_remover.proximo.read() };
-            celula_seguinte.anterior=endereco.clone();
-            unsafe {celula_a_remover.proximo.write(celula_seguinte)};
+            let prox = celula_a_remover.proximo.expect("Não deve ser None, pois não estamos na ponta");
+            let mut celula_seguinte: CelulaDupla<T> = unsafe { prox.read() };
+            celula_seguinte.anterior=Some(endereco.clone());
+            unsafe {prox.write(celula_seguinte)};
         }
         //Desalocando a memoria:
         let layout_remover: Layout = Layout::new::<CelulaDupla<T>>();
@@ -274,29 +314,33 @@ impl<T> ListaDupla<T> {
     }
     pub fn deletar(self: &mut Self, endereco: *mut CelulaDupla<T>) {
         //deleta a célula no endereço dado
-        match endereco==self.cabeca {
-            true=> self.deletar_cabeca(),
-            false => {
-                let celula = unsafe {endereco.read()};
-                self.deletar_apos(celula.anterior)
-            },
+        if endereco==self.cabeca {self.deletar_cabeca()}
+        else {
+            let celula = unsafe {endereco.read()};
+            self.deletar_apos(celula.anterior.expect("Deve haver uma célula anterior, pois não estamos na cabeça"))
         }
     }
     pub fn deletar_cabeca(self: &mut Self) {
         assert!(self.n>0);
         let cabeca_atual=self.cabeca;
         let celula_cabeca = unsafe {cabeca_atual.read()};
-        self.cabeca = celula_cabeca.proximo.clone();
-        let layout_remover: Layout = Layout::new::<CelulaDupla<T>>();
-        unsafe { dealloc(cabeca_atual as *mut u8, layout_remover) };
+        if self.n>1 {
+            self.cabeca = celula_cabeca.proximo.expect("Deve haver alguma célula depois da cabeça");
+            let layout_remover: Layout = Layout::new::<CelulaDupla<T>>();
+            unsafe { dealloc(cabeca_atual as *mut u8, layout_remover) };
+            let mut celula_seguinte = unsafe {self.cabeca.read()};
+            celula_seguinte.anterior = None;
+            unsafe { self.cabeca.write(celula_seguinte)};
+        }
         self.n-=1;
     }
 
-    fn anterior(self:&mut Self, endereco: *mut CelulaDupla<T>) -> (T,*mut CelulaDupla<T>) {
-        if endereco==self.cabeca {panic!()}
+    fn anterior(self:&mut Self, endereco: *mut CelulaDupla<T>) -> Option<(T,*mut CelulaDupla<T>)> {
+        if endereco==self.cabeca {return None}
         let celula_atual: CelulaDupla<T> = unsafe {endereco.read()};
-        let celula_anterior: CelulaDupla<T> = unsafe{celula_atual.anterior.read()};
-        (celula_anterior.conteudo, celula_atual.anterior)
+        let anterior = celula_atual.anterior.expect("Não estamos na cabeça");
+        let celula_anterior: CelulaDupla<T> = unsafe{anterior.read()};
+        Some((celula_anterior.conteudo, anterior))
     }
 }
 
@@ -311,15 +355,23 @@ impl<'b,T> Iterator for IteradorLista<'b,T> {
     fn next(&mut self) -> Option<Self::Item> {
         if self.contagem==self.lista.n {None}
         else if self.contagem==0 {
-            let (conteudo, _proximo_endereco) : (T, *const CelulaSimples<T>) = self.lista.ler_cabeca();
-            self.contagem+=1;
-            Some(conteudo)
+            match self.lista.ler_cabeca() {
+                None => None,
+                Some((conteudo, _proximo_endereco)) => {
+                    self.contagem+=1;
+                    Some(conteudo)
+                },
+            }
         }
         else {
-            let (conteudo, proximo_endereco): (T, *const CelulaSimples<T>) = self.lista.proxima(self.endereco_atual);
-            self.endereco_atual=proximo_endereco;
-            self.contagem+=1;
-            Some(conteudo)
+            match self.lista.proxima(self.endereco_atual) {
+                Some((conteudo, proximo_endereco)) => {
+                    self.endereco_atual=proximo_endereco;
+                    self.contagem+=1;
+                    Some(conteudo)
+                },
+                None => None,
+            }
         }
     }
 }
@@ -350,15 +402,23 @@ impl<'b,T> Iterator for IteradorListaDupla<'b, T> {
     fn next(&mut self) -> Option<Self::Item> {
         if self.contagem==self.lista.n {None}
         else if self.contagem==0 {
-            let (conteudo, _proximo_endereco) : (T, *const CelulaDupla<T>) = self.lista.ler_cabeca();
-            self.contagem+=1;
-            Some(conteudo)
+            match self.lista.ler_cabeca() {
+                None => None,
+                Some((conteudo, _proximo_endereco)) => {
+                    self.contagem+=1;
+                    Some(conteudo)
+                },
+            }
         }
         else {
-            let (conteudo, proximo_endereco): (T, *const CelulaDupla<T>) = self.lista.proxima(self.endereco_atual);
-            self.endereco_atual=proximo_endereco;
-            self.contagem+=1;
-            Some(conteudo)
+            match self.lista.proxima(self.endereco_atual) {
+                Some((conteudo, proximo_endereco)) => {
+                    self.endereco_atual=proximo_endereco;
+                    self.contagem+=1;
+                    Some(conteudo)
+                },
+                None => None,
+            }
         }
     }
 }
@@ -447,7 +507,7 @@ fn _teste_bom_dia() {
     unsafe { conteudo = lista.cabeca.read().conteudo; }
     print!("{}",conteudo);
     for _i in 1..mensagem.len() {
-        let ( conteudo, end) = lista.proxima_mut(endereco);
+        let ( conteudo, end) = lista.proxima_mut(endereco).expect("Não chegamos ao fim da lista");
         endereco=end;
         print!("{}",conteudo);
         if conteudo=='m' { pos_inserir =endereco }
@@ -457,7 +517,7 @@ fn _teste_bom_dia() {
     println!("{}",lista);
     assert_eq!("Boms dia!", format!("{}",lista));
     println!("Inserindo exclamação!");
-    let (_c, pos_apos) = lista.proxima_mut(pos_inserir);
+    let (_c, pos_apos) = lista.proxima_mut(pos_inserir).expect("Não chegamos ao fim da lista");
     lista.alterar(pos_apos, '!');
     println!("{}",lista);
     assert_eq!("Bom! dia!", format!("{}",lista));
@@ -500,8 +560,8 @@ fn _teste_lista_dupla(){
     println!("\nInserindo exclamações entre as letras");
     for _i in 1..mensagem.len() {
         lista.inserir_antes(endereco, '!');
-        let (_c, end) = lista.anterior(endereco);
-        let (_c, end) = lista.anterior(end);
+        let (_c, end) = lista.anterior(endereco).expect("Não estamos no início da lista");
+        let (_c, end) = lista.anterior(end).expect("Não estamos no início da lista");
         endereco=end;
     }
     println!("{}",lista);
