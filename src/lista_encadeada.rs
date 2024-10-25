@@ -3,20 +3,19 @@ use std::fmt::{format, Display, Formatter};
 use std::ptr::write;
 
 pub struct CelulaSimples<T> {
-    conteudo: T,
-    // proximo: *mut CelulaSimples<T>,
-    proximo: Option<*mut CelulaSimples<T>>,
+    pub conteudo: T,
+    pub proximo: Option<*mut CelulaSimples<T>>,
 }
 pub struct CelulaDupla<T> {
-    conteudo: T,
-    proximo: Option<*mut CelulaDupla<T>>,
-    anterior: Option<*mut CelulaDupla<T>>,
+    pub conteudo: T,
+    pub proximo: Option<*mut CelulaDupla<T>>,
+    pub anterior: Option<*mut CelulaDupla<T>>,
 }
 
 pub struct ListaEncadeada<T> {
-    n: u32,
-    cabeca: *mut CelulaSimples<T>,
-    ponta: *mut CelulaSimples<T>,
+    pub n: usize,
+    pub cabeca: *mut CelulaSimples<T>,
+    pub ponta: *mut CelulaSimples<T>,
     // tamanho_unidade: usize,
 }
 impl<T> ListaEncadeada<T> {
@@ -99,12 +98,13 @@ impl<T> ListaEncadeada<T> {
             }
         }
     }
-    fn ler_cabeca(self: &Self) ->Option<(T,*const CelulaSimples<T>)> {
+    fn ler_cabeca(self: &Self) ->(T, Option<*const CelulaSimples<T>>) {
+        //A lista nao pode estar vazia, ou seja, a cabeca tem que ter conteudo
         let celula: CelulaSimples<T> = unsafe {self.cabeca.read()};
         let conteudo: T = celula.conteudo;
         match celula.proximo {
-        Some(apontador) => Some((conteudo,apontador)),
-        None => None,
+            Some(apontador) => (conteudo, Some(apontador)),
+            None => (conteudo, None),
         }
     }
 
@@ -131,11 +131,13 @@ impl<T> ListaEncadeada<T> {
     }
     pub fn deletar_cabeca(self: &mut Self) {
         assert!(self.n>0);
-        let cabeca_atual=self.cabeca;
-        let celula_cabeca = unsafe {cabeca_atual.read()};
-        self.cabeca = celula_cabeca.proximo.expect("O apontador da nova cabeça não pode ser None, pois a lista não é vazia");
-        let layout_remover: Layout = Layout::new::<CelulaSimples<T>>();
-        unsafe { dealloc(cabeca_atual as *mut u8, layout_remover) };
+        if self.n>1 {
+            let cabeca_atual = self.cabeca;
+            let celula_cabeca = unsafe { cabeca_atual.read() };
+            self.cabeca = celula_cabeca.proximo.expect("O apontador da nova cabeça não pode ser None, pois a lista não é vazia");
+            let layout_remover: Layout = Layout::new::<CelulaSimples<T>>();
+            unsafe { dealloc(cabeca_atual as *mut u8, layout_remover) };
+        }
         self.n-=1;
     }
 
@@ -143,9 +145,9 @@ impl<T> ListaEncadeada<T> {
 }
 
 pub struct ListaDupla<T> {
-    n: u32,
-    cabeca: *mut CelulaDupla<T>,
-    ponta: *mut CelulaDupla<T>,
+    pub n: usize,
+    pub cabeca: *mut CelulaDupla<T>,
+    pub ponta: *mut CelulaDupla<T>,
 }
 impl<T> ListaDupla<T> {
     pub fn novo() ->Self {
@@ -161,15 +163,21 @@ impl<T> ListaDupla<T> {
     }
     pub fn colocar(self: &mut Self,elemento: T) {
         //Insere um elemento na ponta da lista
-        let nova_celula: CelulaDupla<T> = CelulaDupla {
-            conteudo: elemento,
-            proximo: None,
-            anterior: Some(self.ponta.clone()),
-        };
+
         if self.n==0 {
+            let nova_celula = CelulaDupla {
+                conteudo: elemento,
+                proximo: None,
+                anterior: None,
+            };
             unsafe {self.cabeca.write(nova_celula)};
         }
         else {
+            let nova_celula: CelulaDupla<T> = CelulaDupla {
+                conteudo: elemento,
+                proximo: None,
+                anterior: Some(self.ponta.clone()),
+            };
             let layout:Layout = Layout::new::<CelulaDupla<T>>();
             let ponteiro: *mut CelulaDupla<T>  = unsafe {alloc(layout) as *mut CelulaDupla<T>};
             let mut penultima_celula = unsafe { self.ponta.read() };
@@ -242,19 +250,6 @@ impl<T> ListaDupla<T> {
         self.n+=1;
     }
     fn proxima_mut(self:&mut Self, endereco: *mut CelulaDupla<T>) -> Option<(T, *mut CelulaDupla<T>)>{
-        // if endereco == self.ponta {
-        //     panic!()
-        // }
-        // unsafe {
-        //     let celula_atual: CelulaDupla<T> = { endereco.read() };
-        //     match celula_atual.proximo {
-        //         None => { None }
-        //         Some(ponteiro) => {
-        //             let proxima_celula: CelulaDupla<T> = { ponteiro.read() };
-        //             Some((proxima_celula.conteudo, ponteiro))
-        //         }
-        //     }
-        // }
         match self.proxima(endereco as *const CelulaDupla<T>) {
             None =>None,
             Some((conteudo, ponteiro)) => Some((conteudo, ponteiro as *mut CelulaDupla<T>))
@@ -275,12 +270,13 @@ impl<T> ListaDupla<T> {
             }
         }
     }
-    fn ler_cabeca(self: &Self) ->Option<(T,*const CelulaDupla<T>)> {
+    fn ler_cabeca(self: &Self) ->(T, Option<*const CelulaDupla<T>>) {
+        //A lista nao pode estar vazia, ou seja, a cabeca tem que ter conteudo
         let celula: CelulaDupla<T> = unsafe {self.cabeca.read()};
         let conteudo: T = celula.conteudo;
         match celula.proximo {
-            Some(apontador) => Some((conteudo,apontador)),
-            None => None,
+            Some(apontador) => (conteudo, Some(apontador)),
+            None => (conteudo, None),
         }
     }
     pub fn alterar(self: &Self, endereco: *mut CelulaDupla<T>, conteudo: T) {
@@ -353,15 +349,10 @@ impl<'b,T> Iterator for IteradorLista<'b,T> {
     type Item = T;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.contagem==self.lista.n {None}
+        if self.contagem==self.lista.n as u32 {None}
         else if self.contagem==0 {
-            match self.lista.ler_cabeca() {
-                None => None,
-                Some((conteudo, _proximo_endereco)) => {
-                    self.contagem+=1;
-                    Some(conteudo)
-                },
-            }
+            self.contagem+=1;
+            Some(self.lista.ler_cabeca().0)
         }
         else {
             match self.lista.proxima(self.endereco_atual) {
@@ -393,22 +384,17 @@ impl<'a,T> IntoIterator for &'a ListaEncadeada<T> where T:'a {
 
 pub struct IteradorListaDupla<'a, T> {
     lista: &'a ListaDupla<T>,
-    endereco_atual: *const CelulaDupla<T>,
+    pub endereco_atual: *const CelulaDupla<T>,
     contagem: u32,
 }
 impl<'b,T> Iterator for IteradorListaDupla<'b, T> {
     type Item = T;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.contagem==self.lista.n {None}
+        if self.contagem==self.lista.n as u32 {None}
         else if self.contagem==0 {
-            match self.lista.ler_cabeca() {
-                None => None,
-                Some((conteudo, _proximo_endereco)) => {
-                    self.contagem+=1;
-                    Some(conteudo)
-                },
-            }
+            self.contagem+=1;
+            Some(self.lista.ler_cabeca().0)
         }
         else {
             match self.lista.proxima(self.endereco_atual) {
@@ -493,6 +479,9 @@ fn _teste_bom_dia() {
     let mensagem: &str ="Bom dia!";
     let mut mensagem_fila = mensagem.chars();
     let mut letra_correta:char;
+    lista.colocar('A');
+    assert_eq!("A",format!("{}",lista));
+    lista.deletar_cabeca();
     for letra in mensagem.chars() {
         lista.colocar(letra);
         println!("{}",letra);

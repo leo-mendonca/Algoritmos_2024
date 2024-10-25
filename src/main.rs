@@ -1,18 +1,8 @@
 mod vetores;
 mod lista_encadeada;
+mod editor_texto;
 
-use crate::lista_encadeada::{ListaDupla, ListaEncadeada};
 use crate::vetores::Vetor;
-
-struct Editor<'a> {
-    path: &'a str,
-    pos_cursor: u32,
-    tamanho: u32,
-}
-
-impl<'a> Editor<'a> {
-    //todo()
-}
 
 #[test]
 fn teste_erro() {
@@ -33,4 +23,5 @@ fn main() {
     // println!("{}",lista);
     // println!("{}",lista_2);
     // lista_encadeada::lista_main();
+    editor_texto::main_editor()
 }
