@@ -1,10 +1,11 @@
 use crate::lista_encadeada::{CelulaDupla, ListaDupla};
 use std::fs;
-use std::io::{BufRead};
+use std::io::{BufRead, Write};
 use std::io;
+use crossterm:: {event, execute, terminal};
+use crossterm::event::KeyCode;
 
-
-const N_LER: usize = 10;
+const N_LER: usize = 50;
 
 struct Editor {
     path: String, //local do arquivo de texto
@@ -35,6 +36,22 @@ fn ler_arquivo(arquivo:fs::File) -> ListaDupla<char> {
         }
     }
     return lista
+}
+fn escrever_arquivo(mut arquivo:fs::File, lista:&ListaDupla<char>) {
+    // let mut escritor = io::BufWriter::new(arquivo);
+    for letra in lista.into_iter() {
+        write!(&mut arquivo, "{}",letra).expect("Erro ao salvar o arquivo");
+    }
+}
+
+fn aguardar_enter() {
+    //aguarda o usuario apertar a tecla Enter para prosseguir
+    loop {
+        let leitura: event::Event = event::read().expect("Não deve haver erro na leitura do teclado");
+        if let event::Event::Key(chave) = leitura {
+            if (chave.code==event::KeyCode::Enter) & (chave.kind==event::KeyEventKind::Press)  {return}
+        }
+    }
 }
 
 impl Editor {
@@ -74,10 +91,13 @@ impl Editor {
     }
 
     fn exibir(self:&Self) {
-        println!("{}\u{2038}{}",self.visivel_antes,self.visivel_depois); //\u{2038} e o caractere unicode do cursor
+        execute!(io::stdout(),
+            crossterm::terminal::Clear(terminal::ClearType::All),
+        ).expect("Não devemos ter erro ao escrever no terminal");
+        println!("{}\u{2038}{}\n\n",self.visivel_antes,self.visivel_depois); //\u{2038} é o caractere unicode do cursor
     }
     fn passo_direita(self:&mut Self) {
-        if self.pos_cursor==self.tamanho as u32 {
+        if self.pos_cursor==(self.tamanho-1) as u32 {
             return
         }
         let celula_cursor = unsafe {self.ponteiro_cursor.read()};
@@ -147,22 +167,178 @@ impl Editor {
         }
     }
 
-    //todo() Implementar funcoes para inserir caracteres e salvar a lista
+    fn salvar(self: &Self) {
+        println!("Salvando em {}",self.path);
+        match std::fs::File::create(self.path.clone()) {
+            Err(e) => {println!("Não foi possível abrir o arquivo\n{}",e);
+                return;
+            }
+            Ok(arquivo) => {
+                escrever_arquivo(arquivo, &self.lista_total);
+                println!("Arquivo salvo com sucesso")
+            }
+        }
+    }
+
+    fn escrever(self: &mut Self, c: char) {
+        self.lista_total.inserir_antes(self.ponteiro_cursor, c);
+        let celula_inicio = unsafe {self.ponteiro_inicio_visivel.read()};
+        self.visivel_antes.colocar(c);
+        if self.visivel_antes.n ==N_LER+1 {
+            self.visivel_antes.deletar_cabeca();
+            self.ponteiro_inicio_visivel = celula_inicio.proximo.expect("A lista visivel_antes nao é vazia");
+        }
+        self.pos_cursor+=1;
+        self.tamanho+=1;
+    }
+
+    fn deletar(self: &mut Self) {
+        //Deleta o caractere na posicao do cursor
+        //modificar: ponteiro_cursor, ponteiro_fim_visivel, tamanho, lista_total, visivel_depois
+        if self.pos_cursor==(self.tamanho-1) as u32 { //se estivermos na ultima posicao:
+            let (letra, endereco_anterior) = self.lista_total.anterior_mut(self.ponteiro_cursor).expect("O texto não pode ficar vazio");
+            self.pos_cursor-=1;
+            self.ponteiro_cursor=endereco_anterior;
+            self.lista_total.deletar(self.lista_total.ponta);
+            self.visivel_depois.inserir_antes(self.visivel_depois.cabeca, letra);
+            self.visivel_depois.deletar(self.visivel_depois.ponta);
+            self.visivel_antes.deletar(self.visivel_antes.ponta);
+            if self.visivel_antes.n ==N_LER-1  {
+                if let Some((letra, endereco)) = self.lista_total.anterior(self.ponteiro_inicio_visivel) {
+                    self.visivel_antes.inserir_antes(self.visivel_antes.cabeca, letra);
+                    self.ponteiro_inicio_visivel = endereco;
+                }
+            }
+            return
+        };
+        let ponteiro_cursor_atual =self.ponteiro_cursor.clone();
+        match self.lista_total.proxima_mut(self.ponteiro_cursor) {
+            None => {return} //Neste caso estamos na ultima posicao, o que nao deve acontecer
+            Some((_letra, ponteiro)) => {self.ponteiro_cursor = ponteiro;}
+        }
+        self.lista_total.deletar(ponteiro_cursor_atual);
+
+        let celula_fim = unsafe {self.ponteiro_fim_visivel.read()};
+        self.visivel_depois.deletar_cabeca();
+        if let Some(endereco) =  celula_fim.proximo {
+            self.visivel_depois.colocar(self.lista_total.ler(endereco));
+            self.ponteiro_fim_visivel = endereco;
+        }
+        self.tamanho-=1;
+    }
+    fn backspace(self: &mut Self) {
+        if self.pos_cursor==0 {return}
+        self.passo_esquerda();
+        self.deletar();
+    }
+
+    fn ir_final(self:&mut Self) {
+        loop {
+            self.passo_direita();
+            if self.pos_cursor+1==self.tamanho as u32 {return}
+        }
+    }
+    fn ir_inicio(self:&mut Self) {
+        loop {
+            self.passo_esquerda();
+            if self.pos_cursor==0 {return}
+        }
+    }
+
+
+    //todo() Implementar funcao para selecionar arquivo de entrada
 }
 
 pub fn main_editor() {
+    //Testes estáticos com o prelúdio de Memórias Póstumas de Brás Cubas:
     let mut ed=Editor::novo("Input/texto_teste.txt").expect("Erro na leitura do texto");
     println!("Lista visivel: \n{}",ed.visivel_depois);
     println!("Texto completo: \n{}", ed.lista_total);
-    ed.exibir();
+    println!("{}\u{2038}{}\n\n",ed.visivel_antes,ed.visivel_depois);
     ed.passo_direita();
-    ed.exibir();
+    println!("{}\u{2038}{}\n\n",ed.visivel_antes,ed.visivel_depois);
     ed.passo_esquerda();
-    ed.exibir();
+    println!("{}\u{2038}{}\n\n",ed.visivel_antes,ed.visivel_depois);
     ed.andar_multiplos(-1);
-    ed.exibir();
+    println!("{}\u{2038}{}\n\n",ed.visivel_antes,ed.visivel_depois);
     ed.andar_multiplos(10);
+    println!("{}\u{2038}{}\n\n",ed.visivel_antes,ed.visivel_depois);
+    ed.andar_multiplos(-10);
+    println!("{}\u{2038}{}\n\n",ed.visivel_antes,ed.visivel_depois);
+
+
+    println!("Teste Interativo com Esaú e Jacó (livro completo)\nPressione Enter para ler");
+    aguardar_enter();
+
+    ed = Editor::novo("Input/Esau e Jaco.txt").expect("O path deve ser válido");
     ed.exibir();
-    ed.andar_multiplos(-5);
-    ed.exibir();
+    crossterm::terminal::enable_raw_mode().expect("Não devemos ter erros ao habilitar o modo raw");
+    loop {
+        let leitura: event::Event = event::read().expect("Não deve haver erro na leitura do teclado");
+        if let event::Event::Key(evento) = leitura {
+            if evento.kind == event::KeyEventKind::Press { //Temos que checar se a tecla foi pressionada, senao cada input eh lido duas vezes
+                //Comandos do usuario segurando Ctrl (e.g. salvar: Ctrl+s)
+                if evento.modifiers == event::KeyModifiers::CONTROL {
+                    match evento.code {
+                        KeyCode::Char('s') => { ed.salvar() }
+                        _ => {}
+                    }
+                }
+                else {
+                    match evento.code {
+                        KeyCode::Backspace => {
+                            ed.backspace();
+                        }
+                        KeyCode::Delete => {
+                            ed.deletar();
+                        }
+                        KeyCode::Enter => {
+                            ed.escrever('\n');
+                        }
+                        KeyCode::Left => {
+                            ed.passo_esquerda();
+                        }
+                        KeyCode::Right => {
+                            ed.passo_direita();
+                        }
+                        KeyCode::Up => {}
+                        KeyCode::Down => {}
+                        KeyCode::Home => {
+                            ed.ir_inicio();
+                        }
+                        KeyCode::End => {
+                            ed.ir_final();
+                        }
+                        KeyCode::PageDown => {
+                            ed.andar_multiplos(N_LER as i32);
+                        }
+                        KeyCode::PageUp => {
+                            ed.andar_multiplos(-(N_LER as i32));
+                        }
+                        KeyCode::Tab => {}
+                        KeyCode::BackTab => {}
+
+                        KeyCode::Insert => {}
+                        KeyCode::Char(c) => {
+                            ed.escrever(c);
+                        }
+                        KeyCode::Null => {}
+                        KeyCode::Esc => { break }
+                        KeyCode::CapsLock => {}
+                        KeyCode::ScrollLock => {}
+                        KeyCode::NumLock => {}
+                        KeyCode::PrintScreen => {}
+                        KeyCode::Pause => {}
+                        KeyCode::Menu => {}
+                        KeyCode::KeypadBegin => {}
+                        KeyCode::Media(_) => {}
+                        KeyCode::Modifier(_) => {}
+                        KeyCode::F(_) => {}
+                    }
+                    ed.exibir();
+
+                }
+            }
+        }
+    }
 }
