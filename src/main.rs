@@ -2,7 +2,7 @@ mod vetores;
 mod lista_encadeada;
 mod editor_texto;
 
-use crate::vetores::Vetor;
+// use crate::vetores::Vetor;
 
 #[test]
 fn teste_erro() {

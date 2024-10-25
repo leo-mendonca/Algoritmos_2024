@@ -1,6 +1,6 @@
 use std::alloc::{alloc, dealloc, Layout};
-use std::fmt::{format, Display, Formatter};
-use std::ptr::write;
+use std::fmt::{Display, Formatter};
+// use std::ptr::write;
 
 pub struct CelulaSimples<T> {
     pub conteudo: T,
@@ -194,7 +194,7 @@ impl<T> ListaDupla<T> {
         let mut celula_anterior:CelulaDupla<T> = unsafe {endereco.read()};
         let end_seguinte: Option<*mut CelulaDupla<T>> = celula_anterior.proximo;
 
-        let mut celula_seguinte: Option<CelulaDupla<T>> = match end_seguinte{
+        let celula_seguinte: Option<CelulaDupla<T>> = match end_seguinte{
             Some(ponteiro) =>Some(unsafe { ponteiro.read() }),
             None => None,
         };
@@ -437,12 +437,18 @@ impl<T:Display> Display for ListaEncadeada<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         if std::any::type_name::<T>() =="char" {
             Ok(for s in self.into_iter() {
-                write!(f, "{}", s);
+                match write!(f, "{}", s) {
+                    Ok(_) => {},
+                    Err(e) => {return Err(e)},
+                };
             })
         }
         else {
             Ok(for s in self.into_iter() {
-                write!(f,"{},",s);
+                match write!(f,"{},",s) {
+                    Ok(_) => {}
+                    Err(e) => {return Err(e)}
+                };
             })
         }
     }
@@ -460,12 +466,18 @@ impl<T:Display> Display for ListaDupla<T> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         if std::any::type_name::<T>() =="char" {
             Ok(for s in self.into_iter() {
-                write!(f, "{}", s);
+                match write!(f, "{}", s) {
+                    Ok(_) => {}
+                    Err(e) => {return Err(e)}
+                };
             })
         }
         else {
             Ok(for s in self.into_iter() {
-                write!(f,"{},",s);
+                match write!(f,"{},",s) {
+                    Ok(_) => {}
+                    Err(e) => {return Err(e)}
+                };
             })
         }
     }

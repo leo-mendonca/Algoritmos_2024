@@ -1,9 +1,8 @@
 use crate::lista_encadeada::{CelulaDupla, ListaDupla};
 use std::fs;
-use std::io::{BufRead, Read};
+use std::io::{BufRead};
 use std::io;
-use std::ptr::read;
-use crate::lista_encadeada;
+
 
 const N_LER: usize = 10;
 
@@ -48,7 +47,7 @@ impl Editor {
         let mut visivel_depois: ListaDupla<char> = ListaDupla::<char>::novo();
         let mut it = lista_total.into_iter();
         let mut ponteiro_fim_visivel: *const CelulaDupla<char> = lista_total.cabeca.clone();
-        'lista_depois: for i in 0..N_LER {
+        'lista_depois: for _i in 0..N_LER {
             match it.next() {
                 Some(letra) => {
                     visivel_depois.colocar(letra);
@@ -112,13 +111,9 @@ impl Editor {
         let celula_velho_cursor = unsafe {self.ponteiro_cursor.read()};
         self.pos_cursor-=1;
         self.ponteiro_cursor = celula_velho_cursor.anterior.expect("Se estivéssemos no início do arquivo, a função já teria retornado");
-        let velho_conteudo_cursor = celula_velho_cursor.conteudo;
         let celula_novo_cursor = unsafe {self.ponteiro_cursor.read()};
         let novo_conteudo_cursor = celula_novo_cursor.conteudo;
-        // self.visivel_antes.colocar(conteudo_cursor);
         self.visivel_antes.deletar(self.visivel_antes.ponta);
-        // assert!(self.visivel_antes.n<=N_LER+1);
-        // self.visivel_depois.deletar_cabeca();
 
         //alterando os apontadores de inicio e fim da parte visivel:
         let celula_fim = unsafe {self.ponteiro_fim_visivel.read()};
@@ -128,9 +123,7 @@ impl Editor {
 
         }
         self.visivel_depois.inserir_antes(self.visivel_depois.cabeca, novo_conteudo_cursor);
-
         let celula_inicio = unsafe {self.ponteiro_inicio_visivel.read()};
-
         match celula_inicio.anterior {
             None => {}
             Some(apontador) => {
