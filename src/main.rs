@@ -1,7 +1,9 @@
+use crate::tabela_chave_valor::main_tabela;
+
 mod vetores;
 mod lista_encadeada;
 mod editor_texto;
-
+mod tabela_chave_valor;
 // use crate::vetores::Vetor;
 
 #[test]
@@ -23,5 +25,8 @@ fn main() {
     // println!("{}",lista);
     // println!("{}",lista_2);
     // lista_encadeada::lista_main();
-    editor_texto::main_editor()
+    // editor_texto::main_editor()
+    main_tabela()
+
+
 }

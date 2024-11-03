@@ -433,6 +433,8 @@ impl<'a,T> IntoIterator for &'a ListaDupla<T> where T:'a {
     }
 }
 
+
+
 impl<T:Display> ListaEncadeada<T> {
     fn imprimir_lista(self: &Self) {
         for s in self.into_iter() {
