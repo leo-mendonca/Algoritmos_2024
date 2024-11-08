@@ -289,7 +289,7 @@ fn _teste_vetor_generico<T:Vetor>(_vetor:T) {
 }
 
 
-fn _vetor_main() {
+fn main() {
     println!("\nVetor O(n)");
     _tempo_operacoes_vetor(10000, VetorOn::novo());
     _tempo_operacoes_vetor(100000, VetorOn::novo());

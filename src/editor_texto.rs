@@ -1,10 +1,13 @@
-use crate::lista_encadeada::{CelulaDupla, ListaDupla};
+// pub mod lista_encadeada;
+
+
+pub(crate) use Algoritmos::lista_encadeada::{CelulaDupla, ListaDupla, escrever_arquivo, ler_arquivo};
 use std::fs;
 use std::io::Write;
 use std::io;
 use crossterm::{event, execute, terminal};
 use crossterm::event::KeyCode;
-use crate::lista_encadeada;
+
 
 const N_LER: usize = 50;
 
@@ -36,7 +39,7 @@ impl Editor {
             Ok(f) => {f}
             Err(e) => {return Err(e)}
         };
-        let lista_total: ListaDupla<char> = lista_encadeada::ler_arquivo(arquivo);
+        let lista_total: ListaDupla<char> = ler_arquivo(arquivo);
         let mut visivel_depois: ListaDupla<char> = ListaDupla::<char>::novo();
         let mut it = lista_total.into_iter();
         let mut ponteiro_fim_visivel: *const CelulaDupla<char> = lista_total.cabeca.clone();
@@ -150,7 +153,7 @@ impl Editor {
                 return;
             }
             Ok(arquivo) => {
-                lista_encadeada::escrever_arquivo(arquivo, &self.lista_total);
+                escrever_arquivo(arquivo, &self.lista_total);
                 println!("Arquivo salvo com sucesso")
             }
         }
