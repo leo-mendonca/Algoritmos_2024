@@ -1,5 +1,8 @@
+use std::io::Write;
 use std::alloc::{alloc, dealloc, Layout};
 use std::fmt::{Display, Formatter};
+use std::{fs, io};
+use std::io::BufRead;
 // use std::ptr::write;
 
 pub struct CelulaSimples<T> {
@@ -143,7 +146,7 @@ impl<T> ListaEncadeada<T> {
 
 
 }
-
+#[derive(Debug)]
 pub struct ListaDupla<T> {
     pub n: usize,
     pub cabeca: *mut CelulaDupla<T>,
@@ -493,6 +496,31 @@ impl<T:Display> Display for ListaDupla<T> {
     }
 }
 
+pub fn ler_arquivo(arquivo:fs::File) -> ListaDupla<char> {
+    // let f = fs::File::open(path).expect("O path deve estar correto");
+    let leitor = io::BufReader::new(arquivo);
+    let mut lista :ListaDupla<char> = ListaDupla::<char>::novo();
+    'varrendo_linhas: for linha in leitor.lines() {
+        match linha {
+            Ok(conteudo_linha) => {
+                for letra in conteudo_linha.chars() {
+                    lista.colocar(letra);
+                }
+                lista.colocar('\n');
+                //todo() tratar o caso em que a ultima linha nao termina em \n
+            }
+            Err(_) => {break 'varrendo_linhas}
+        }
+    }
+    return lista
+}
+
+pub fn escrever_arquivo(mut arquivo:fs::File, lista:&ListaDupla<char>) {
+    // let mut escritor = io::BufWriter::new(arquivo);
+    for letra in lista.into_iter() {
+        write!(&mut arquivo, "{}",letra).expect("Erro ao salvar o arquivo");
+    }
+}
 
 #[test]
 fn _teste_bom_dia() {
@@ -578,8 +606,3 @@ fn _teste_lista_dupla(){
     println!("{}",lista);
     assert_eq!(format!("{}",lista), "P!a!l!a!v!r!a");
 }
-// pub fn lista_main() {
-//     _teste_bom_dia();
-//     _teste_numerico();
-//     _teste_lista_dupla();
-// }

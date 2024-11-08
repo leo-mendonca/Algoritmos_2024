@@ -1,9 +1,10 @@
 use crate::lista_encadeada::{CelulaDupla, ListaDupla};
 use std::fs;
-use std::io::{BufRead, Write};
+use std::io::Write;
 use std::io;
-use crossterm:: {event, execute, terminal};
+use crossterm::{event, execute, terminal};
 use crossterm::event::KeyCode;
+use crate::lista_encadeada;
 
 const N_LER: usize = 50;
 
@@ -17,31 +18,6 @@ struct Editor {
     lista_total: ListaDupla<char>, //lista encadeada contendo o texto inteiro do arquivo
     visivel_antes: ListaDupla<char>, //lista contendo os N_leitura caracteres antes do cursor
     visivel_depois: ListaDupla<char>, //lista contendo os N_leitura caracteres a partir do cursor (inclusive)
-}
-
-fn ler_arquivo(arquivo:fs::File) -> ListaDupla<char> {
-    // let f = fs::File::open(path).expect("O path deve estar correto");
-    let leitor = io::BufReader::new(arquivo);
-    let mut lista :ListaDupla<char> = ListaDupla::<char>::novo();
-    'varrendo_linhas: for linha in leitor.lines() {
-        match linha {
-            Ok(conteudo_linha) => {
-                for letra in conteudo_linha.chars() {
-                    lista.colocar(letra);
-                }
-                lista.colocar('\n');
-                //todo() tratar o caso em que a ultima linha nao termina em \n
-            }
-            Err(_) => {break 'varrendo_linhas}
-        }
-    }
-    return lista
-}
-fn escrever_arquivo(mut arquivo:fs::File, lista:&ListaDupla<char>) {
-    // let mut escritor = io::BufWriter::new(arquivo);
-    for letra in lista.into_iter() {
-        write!(&mut arquivo, "{}",letra).expect("Erro ao salvar o arquivo");
-    }
 }
 
 fn aguardar_enter() {
@@ -60,7 +36,7 @@ impl Editor {
             Ok(f) => {f}
             Err(e) => {return Err(e)}
         };
-        let lista_total: ListaDupla<char> = ler_arquivo(arquivo);
+        let lista_total: ListaDupla<char> = lista_encadeada::ler_arquivo(arquivo);
         let mut visivel_depois: ListaDupla<char> = ListaDupla::<char>::novo();
         let mut it = lista_total.into_iter();
         let mut ponteiro_fim_visivel: *const CelulaDupla<char> = lista_total.cabeca.clone();
@@ -174,7 +150,7 @@ impl Editor {
                 return;
             }
             Ok(arquivo) => {
-                escrever_arquivo(arquivo, &self.lista_total);
+                lista_encadeada::escrever_arquivo(arquivo, &self.lista_total);
                 println!("Arquivo salvo com sucesso")
             }
         }
@@ -249,7 +225,7 @@ impl Editor {
     //todo() Implementar funcao para selecionar arquivo de entrada
 }
 
-pub fn main_editor() {
+pub fn main() {
     //Testes estáticos com o prelúdio de Memórias Póstumas de Brás Cubas:
     let mut ed=Editor::novo("Input/texto_teste.txt").expect("Erro na leitura do texto");
     println!("Lista visivel: \n{}",ed.visivel_depois);
@@ -323,7 +299,10 @@ pub fn main_editor() {
                             ed.escrever(c);
                         }
                         KeyCode::Null => {}
-                        KeyCode::Esc => { break }
+                        KeyCode::Esc => {
+                            crossterm::terminal::disable_raw_mode().expect("Desabilitar o modo raw do console");
+                            break
+                        }
                         KeyCode::CapsLock => {}
                         KeyCode::ScrollLock => {}
                         KeyCode::NumLock => {}
