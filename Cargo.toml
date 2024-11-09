@@ -16,4 +16,7 @@ path = "src/main.rs"
 name = "editor"
 path = "src/editor_texto.rs"
 
+[[bin]]
+name = "grafos"
+path = "src/grafos.rs"
 
