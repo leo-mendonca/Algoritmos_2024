@@ -20,3 +20,6 @@ path = "src/editor_texto.rs"
 name = "grafos"
 path = "src/grafos.rs"
 
+[[bin]]
+name = "vetor"
+path = "src/vetores.rs"

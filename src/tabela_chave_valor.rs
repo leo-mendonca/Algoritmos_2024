@@ -1,14 +1,11 @@
 use std::{fs, io};
 use std::hash::{Hasher, Hash, RandomState, BuildHasher};
 use std::io::BufRead;
-use std::ptr::hash;
-use std::vec::IntoIter;
 use crate::lista_encadeada::{CelulaDupla, IteradorListaDupla, ListaDupla};
 
 
 
 pub struct TabelaCV<Tc: Hash+Eq+Clone,Tv> {
-    //todo() implementar usando vetores em vez de listas encadeadas para evitar os erros encontrados ao usar String na lista
     //Tabela chave-valor com chaves do tipo Tc (tem que ser espalhavel/hashable) e valores do tipo Tv
     d:u64,
     // v:Vec<ListaDupla<(Tc,Tv)>>, //Vetor com a referencia de cada lista encadeada correspondente a um valor do hash,
@@ -60,15 +57,36 @@ impl<Tc:Hash+Eq+Clone,Tv> TabelaCV<Tc,Tv> {
     }
 
     pub fn ler(self: &Self, chave: &Tc) -> Option<&Tv> {
+        //Busca o valor correspondente à chave passada, e retorna uma referência imutável a esse valor
+        //Se não encontrar, retorna None
         let hash_chave = self.calcular_hash((*chave).clone());
         match self.procurar_chave_hash(chave, hash_chave) {
             Some((_endereco, valor)) => Some(valor),
             None => None
         }
     }
+    pub fn ler_mut(self: &mut Self, chave: &Tc) -> Option<&mut Tv> {
+        //Idêntica a ler, mas retorna uma referência mutável ao valor encontrado
+        let hash_chave = self.calcular_hash((*chave).clone());
+        match self.procurar_chave_hash_mut(chave, hash_chave) {
+            None => None,
+            Some((_endereco, valor)) => Some(valor),
+        }
+    }
 
+
+    fn procurar_chave_hash_mut(self: &mut Self, chave: &Tc, hash_chave: u64) -> Option<(usize, &mut Tv)> {
+        //Idêntica à função procurar_chave_hash, mas retorna uma referência mutável ao valor, em vez de uma referência imutável
+        let mut v: &mut Vec<(Tc, Tv)> = &mut self.v[hash_chave as usize];
+        for (i, (c, val)) in v.iter_mut().enumerate() {
+            if c==chave {
+                return Some((i,val))
+            }
+        }
+        None
+    }
     fn procurar_chave_hash(self: &Self, chave: &Tc, hash_chave: u64) -> Option<(usize, &Tv)> {
-        let v = self.v.get(hash_chave as usize).expect("O vetor deve conter um subvetor na posicao correspondente a cada valor do hash");
+        let v: &Vec<(Tc, Tv)> = self.v.get(hash_chave as usize).expect("O vetor deve conter um subvetor na posicao correspondente a cada valor do hash");
         for (i, (c, val)) in v.iter().enumerate() {
             if c==chave {
                 return Some((i,val))
@@ -143,7 +161,7 @@ impl<Tc:Hash+Clone+Eq> ConjuntoIteravel<Tc> {
                 self.tabela.inserir(elemento, self.lista.ponta.clone());
                 return
             }
-            Some(endereco) => {
+            Some(_endereco) => {
                 return //elemento ja esta no conjunto
             }
         }
