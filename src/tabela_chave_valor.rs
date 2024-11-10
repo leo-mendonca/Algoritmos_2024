@@ -73,7 +73,12 @@ impl<Tc:Hash+Eq+Clone,Tv> TabelaCV<Tc,Tv> {
             Some((_endereco, valor)) => Some(valor),
         }
     }
-
+    pub fn contem(self: &Self, chave: &Tc) -> bool {
+        match self.ler(chave) {
+            None => false,
+            Some(_) => true,
+        }
+    }
 
     fn procurar_chave_hash_mut(self: &mut Self, chave: &Tc, hash_chave: u64) -> Option<(usize, &mut Tv)> {
         //Idêntica à função procurar_chave_hash, mas retorna uma referência mutável ao valor, em vez de uma referência imutável

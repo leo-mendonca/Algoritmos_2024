@@ -23,6 +23,8 @@ fn main() {
     // lista_encadeada::lista_main();
     // editor_texto::main();
     // main_tabela();
+    println!("{}", true as u32);
+    println!("{}", false as u32);
     main_tabela();
 
 }
