@@ -25,11 +25,11 @@ fn main() {
     // main_tabela();
     // println!("{}", true as u32);
     // println!("{}", false as u32);
-    let v = vec![1,2,3];
-    println!("{:?}",v.get(-1_i32 as usize));
-    println!("{:?}",v.get(3 as usize));
-    if let Some(1) = v.get(0) {println!("SIM")}
+    // let v = vec![1,2,3];
+    // println!("{:?}",v.get(-1_i32 as usize));
+    // println!("{:?}",v.get(3 as usize));
+    // if let Some(1) = v.get(0) {println!("SIM")}
 
-    // main_tabela();
+    main_tabela();
 
 }
