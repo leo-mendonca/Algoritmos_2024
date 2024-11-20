@@ -495,6 +495,25 @@ impl<T:Display> Display for ListaDupla<T> {
         }
     }
 }
+impl<T> Drop for ListaDupla<T> {
+    fn drop(&mut self) {
+        //Varre todos os elementos da lista e vai desalocando-os
+        let mut endereco: *mut CelulaDupla<T> = self.cabeca;
+        loop {
+            let layout = Layout::new::<CelulaDupla<T>>();
+            match self.proxima_mut(endereco) {
+                None => {
+                    unsafe {dealloc(endereco as *mut u8,layout)};
+                    break
+                }
+                Some((_conteudo, ponteiro)) => {
+                    unsafe {dealloc(endereco as *mut u8,layout)};
+                    endereco=ponteiro;
+                }
+            }
+        }
+    }
+}
 
 pub fn ler_arquivo(arquivo:fs::File) -> ListaDupla<char> {
     // let f = fs::File::open(path).expect("O path deve estar correto");

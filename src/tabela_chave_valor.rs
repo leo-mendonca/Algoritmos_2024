@@ -4,7 +4,7 @@ use std::io::BufRead;
 use crate::lista_encadeada::{CelulaDupla, IteradorListaDupla, ListaDupla};
 
 
-
+#[derive(Debug)]
 pub struct TabelaCV<Tc: Hash+Eq+Clone,Tv> {
     //Tabela chave-valor com chaves do tipo Tc (tem que ser espalhavel/hashable) e valores do tipo Tv
     d:u64,
@@ -144,7 +144,7 @@ impl<Tc:Hash+Clone+Eq> Conjunto<Tc> {
         self.tabela.remover(elemento)
     }
 }
-
+#[derive(Debug)]
 pub struct ConjuntoIteravel<Tc:Hash+Clone+Eq> {
     tabela: TabelaCV<Tc, *mut CelulaDupla<Tc>>,
     lista: ListaDupla<Tc>,
@@ -195,6 +195,12 @@ impl<'a,T:Hash+Clone+Eq> IntoIterator for &'a ConjuntoIteravel<T> {
     }
 }
 
+// impl<T> FromIterator<A> for ConjuntoIteravel<T> {
+//     fn from_iter<T: IntoIterator<Item=T>>(iter: T) -> Self {
+//         todo!()
+//     }
+// }
+
 fn ler_dicionario(path: &str) ->Conjunto<String> {
     //Essa funcao nao funcionava porque a lista encadeada tem erro de heap corruption quando usamos uma string como entrada
     //Por isso foi necessario modificar a tabela chave-valor para usar vetores em vez de listas
@@ -227,15 +233,6 @@ fn teste_tabela() {
     assert_eq!(t.ler(&'b'),None);
 }
 
-// #[test]
-// fn teste_tabela_string() {
-//     let mut t = TabelaCV::<String, i32>::novo(2);
-//     for s in ["a", "Aarao", "aba", "abacate", "abacateiro", "abacateiros", "abacates", "casa", "lagartixa"] {
-//         t.acrescentar(s.to_string(), 1);
-//     }
-//     assert_eq!(t.ler("a".to_string()), Some(1));
-//     //todo() temos um erro quando usamos String ou str na tabela chave-valor, porque na verdade a lista encadeada parece ser incompatível com tipos de tamanho dinâmico
-// }
 
 #[test]
 pub fn teste_ortografia() {
