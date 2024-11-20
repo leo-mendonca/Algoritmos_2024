@@ -1,4 +1,5 @@
 use std::cmp::{max, min};
+use std::collections::HashSet;
 use rand::random;
 use ndarray::{range, Array2, ErrorKind, ShapeError};
 use ndarray;
@@ -172,7 +173,6 @@ impl ProcessoBootstrap {
         self.tabuleiro = novo_tabuleiro;
         self.config_final = config_final;
         self.t+=1;
-
     }
 
 
@@ -197,7 +197,7 @@ impl ProcessoBootstrap {
             .configure_mesh()
             // .x_labels(15)
             // .y_labels(15)
-            .max_light_lines(15)
+            // .max_light_lines(31)
             .light_line_style(ShapeStyle{
                 color: BLACK.into(),
                 filled:false,
@@ -223,8 +223,8 @@ impl ProcessoBootstrap {
                     Rectangle::new(
                         [(x, y), (x + 1, y + 1)],
                         match v {
-                            true =>     RGBAColor(150,150,150,0.5),
-                            false =>    RGBAColor(255,255,255,0.5),
+                            true =>     RGBAColor(150,150,150,1.0),
+                            false =>    RGBAColor(255,255,255,1.0),
                         }
                             .filled()
                     )
@@ -266,11 +266,17 @@ enum Orientacao {
 struct ColecaoRetangulos{
     //TODO() implementar de forma a obter eficientemente o retângulo com menor x1, maior y1 etc.
     //Cada retangulo é definido por [x1,x2,y1,y2]
-    conjunto: ConjuntoIteravel<[usize;4]>,
+    // conjunto: ConjuntoIteravel<[usize;4]>,
+    conjunto: HashSet<[usize;4]>,
     limites: [usize;4], //Área do sub-tabuleiro [x1,x2,y1,y2]. Deve conter todos os retângulos na área x1<=x<x2 e y1<=y<y2
 }
 impl ColecaoRetangulos {
-
+    fn inserir(self: &mut Self, retangulo: [usize;4]) {
+        self.conjunto.insert(retangulo);
+    }
+    fn remover(self: &mut Self, retangulo: &[usize;4]) {
+        self.conjunto.remove(retangulo);
+    }
 
     fn merge(mut self: Self, mut other: Self, ) -> Self {
         //Funde as coleções de retângulos correspondentes a áreas diferentes do plano
@@ -280,66 +286,77 @@ impl ColecaoRetangulos {
         let candidatos = (&self.conjunto).into_iter()
             .filter(| [_x1, x2, _y1, y2] | (*x2 >= x_fronteira) | (*y2 >= y_fronteira));
         let mut novos_retangulos = ColecaoRetangulos{
-                // conjunto:Vec::<[usize;4]>::new(),
-                conjunto: ConjuntoIteravel::<[usize;4]>::novo(D_HASH),
-                limites: [min(self.limites[0],other.limites[0]),
-                    max(self.limites[1],other.limites[1]),
-                    min(self.limites[2],other.limites[2]),
-                    max(self.limites[3],other.limites[3]),]
+            // conjunto: ConjuntoIteravel::<[usize;4]>::novo(D_HASH),
+            conjunto: HashSet::<[usize;4]>::new(),
+            limites: [min(self.limites[0],other.limites[0]),
+                max(self.limites[1],other.limites[1]),
+                min(self.limites[2],other.limites[2]),
+                max(self.limites[3],other.limites[3]),]
             } ;
         for ret in candidatos {
             // self.remover(ret);
-            novos_retangulos.conjunto.inserir(&ret);
+            // novos_retangulos.conjunto.inserir(&ret);
+            novos_retangulos.inserir(*ret);
         }
         let mut terminar_processo=false;
         while ! terminar_processo
         {
             terminar_processo=true;
             //Indices para deletar apos cada loop
-            let mut novos_acrescentar = Vec::<[usize; 4]>::new();
-            let mut novos_deletar = Vec::<[usize; 4]>::new();
-            let mut self_deletar = Vec::<[usize; 4]>::new();
-            let mut other_deletar = Vec::<[usize; 4]>::new();
+            // let mut novos_acrescentar = Vec::<[usize; 4]>::new();
+            // let mut novos_deletar = Vec::<[usize; 4]>::new();
+            // let mut self_deletar = Vec::<[usize; 4]>::new();
+            // let mut other_deletar = Vec::<[usize; 4]>::new();
+            let mut novos_acrescentar = HashSet::<[usize; 4]>::new();
+            let mut novos_deletar = HashSet::<[usize; 4]>::new();
+            let mut self_deletar = HashSet::<[usize; 4]>::new();
+            let mut other_deletar = HashSet::<[usize; 4]>::new();
 
-            for (i,[x1, x2, y1, y2]) in (&novos_retangulos.conjunto).into_iter().enumerate() {
-                for [x1a,x2a,y1a,y2a] in (&self.conjunto).into_iter() {
+            'loop_externo: for (i,&[x1, x2, y1, y2]) in (&novos_retangulos.conjunto).into_iter().enumerate() {
+                for &[x1a,x2a,y1a,y2a] in (&self.conjunto).into_iter() {
                     if retangulos_tocam([x1,x2,y1,y2], [x1a,x2a,y1a,y2a]) {
                         terminar_processo=false;
                         let novo_ret = [min(x1, x1a),  max(x2, x2a),min(y1, y1a), max(y2, y2a)];
-                        novos_deletar.push([x1,x2,y1,y2]);
-                        novos_acrescentar.push(novo_ret);
-                        self_deletar.push([x1a, x2a, y1a, y2a]);
+                        novos_deletar.insert([x1,x2,y1,y2]);
+                        novos_acrescentar.insert(novo_ret);
+                        self_deletar.insert([x1a, x2a, y1a, y2a]);
                     }
                 }
-                for [x1b, x2b, y1b, y2b] in (&other.conjunto).into_iter() {
+                for &[x1b, x2b, y1b, y2b] in (&other.conjunto).into_iter() {
                     //Checamos se o retangulo tem alguma quase-interseção com os retângulos candidatos
                     if retangulos_tocam([x1, x2, y1, y2], [x1b, x2b, y1b, y2b]) {
                         terminar_processo=false; //Se achamos alguma mudança nesse loop, continuamos o processo
                         let novo_ret = [min(x1, x1b),  max(x2, x2b),min(y1, y1b), max(y2, y2b)];
-                        novos_deletar.push([x1,x2,y1,y2]);
-                        novos_acrescentar.push(novo_ret);
-                        other_deletar.push([x1b, x2b, y1b, y2b]);
+                        novos_deletar.insert([x1,x2,y1,y2]);
+                        novos_acrescentar.insert(novo_ret);
+                        other_deletar.insert([x1b, x2b, y1b, y2b]);
                     }
                 }
-                for (j,[x1c,x2c,y1c,y2c]) in (&novos_retangulos.conjunto).into_iter().enumerate() {
+                for (j,&[x1c,x2c,y1c,y2c]) in (&novos_retangulos.conjunto).into_iter()
+
+                    .enumerate()
+                    .filter(|&(j, &ret)| j>i)
+                {
                     if retangulos_tocam([x1,x2,y1,y2],[x1c,x2c,y1c,y2c]) && i!=j {
                         terminar_processo=false;
                         let novo_ret = [min(x1, x1c),  max(x2, x2c),min(y1, y1c), max(y2, y2c)];
-                        novos_deletar.push([x1,x2,y1,y2]);
-                        novos_deletar.push([x1c,x2c,y1c,y2c]);
-                        novos_acrescentar.push(novo_ret);
+                        novos_deletar.insert([x1,x2,y1,y2]);
+                        novos_deletar.insert([x1c,x2c,y1c,y2c]);
+                        novos_acrescentar.insert(novo_ret);
+                        break 'loop_externo
                     }
                 }
             }
-            for item in novos_deletar.iter() { novos_retangulos.conjunto.remover(item) };
-            for item in novos_acrescentar.iter() { novos_retangulos.conjunto.inserir(item)};
-            for item in self_deletar.iter() { self.conjunto.remover(item) };
-            for item in other_deletar.iter() { other.conjunto.remover(item) };
+            for item in novos_deletar.iter() { novos_retangulos.remover(item) };
+            for item in novos_acrescentar.iter() { novos_retangulos.inserir(*item)};
+            for item in self_deletar.iter() { self.remover(item) };
+            for item in other_deletar.iter() { other.remover(item) };
         }
 
         //Agora é preciso passar para o conjunto de novos retângulos todos aqueles que sobraram em self e em other
-        for ret in self.conjunto.into_iter() {novos_retangulos.conjunto.inserir(&ret)};
-        for ret in other.conjunto.into_iter() {novos_retangulos.conjunto.inserir(&ret)};
+        for ret in self.conjunto.into_iter() {novos_retangulos.inserir(ret)};
+        for ret in other.conjunto.into_iter() {novos_retangulos.inserir(ret)};
+        println!("limites = {:?} \t tamanho = {}",novos_retangulos.limites, novos_retangulos.conjunto.len());
         novos_retangulos
     }
 }
@@ -380,16 +397,20 @@ impl BootstrapMod2Neighbor {
         if largura ==1 { //Se temos uma única célula, ela é um retângulo infectado de lado 1×1 ou nenhum retângulo
             return match self.processo_bootstrap.tabuleiro[[i0,j0]] {
                 true => {
-                    let mut conjunto = ConjuntoIteravel::<[usize;4]>::novo(D_HASH);
-                    conjunto.inserir(&[i0, i0 + 1, j0, j0 + 1]);
+                    // let mut conjunto = ConjuntoIteravel::<[usize;4]>::novo(D_HASH);
+                    // conjunto.inserir(&[i0, i0 + 1, j0, j0 + 1]);
+                    let mut conjunto = HashSet::<[usize;4]>::new();
+                    conjunto.insert([i0, i0 + 1, j0, j0 + 1]);
                     ColecaoRetangulos{
                         conjunto,
                         limites: [i0, i0 + 1, j0, j0 + 1]
                     }
                 }
                 false => {
+                    let mut conjunto = HashSet::<[usize;4]>::new();
                     ColecaoRetangulos{
-                        conjunto: ConjuntoIteravel::<[usize;4]>::novo(D_HASH),
+                        // conjunto: ConjuntoIteravel::<[usize;4]>::novo(D_HASH),
+                        conjunto,
                         limites: [i0, i0 + 1, j0, j0 + 1]
                     }
                 }
@@ -410,9 +431,8 @@ impl BootstrapMod2Neighbor {
     fn resolver_total(self: &mut Self) {
         let n = self.processo_bootstrap.n;
         let retangulos = self.resolver_sub(0, 0,n);
-        println!("{:?}",retangulos);
         let mut tab = &mut self.processo_bootstrap.tabuleiro;
-        for [x1,x2,y1,y2] in (&retangulos.conjunto).into_iter() {
+        for &[x1,x2,y1,y2] in (&retangulos.conjunto).into_iter() {
             for i in x1..x2 {
                 for j in y1..y2 {
                     tab[[i,j]] = true;
@@ -435,7 +455,7 @@ fn teste_metodos() {
             vec![[0,-1],[1,0]],
         ],
     };
-    let n:usize = 256;
+    let n:usize = 512;
     let A = gerar_estado_inicial(0.1,n,n);
     let mut boot_serial = ProcessoBootstrap{
         tabuleiro:A.clone(),
@@ -463,9 +483,10 @@ fn teste_metodos() {
     // boot_serial.fazer_imagens(format!("Teste serial n={}",n).as_str(), false);
     // boot_paralelo.fazer_imagens(format!("Teste paralelo n={}",n).as_str(), true);
     // boot_DC.processo_bootstrap.plotar(format!("Teste DC n={} incial",n).as_str());
+    boot_DC.resolver_total();
     boot_serial.resolver_total(1);
     boot_paralelo.resolver_total(8);
-    boot_DC.resolver_total();
+    boot_serial.plotar("Teste");
     // boot_DC.processo_bootstrap.plotar(format!("Teste DC n={} final",n).as_str());
     assert_eq!(boot_DC.processo_bootstrap.tabuleiro, boot_serial.tabuleiro);
     assert_eq!(boot_serial.tabuleiro,boot_paralelo.tabuleiro);
@@ -485,36 +506,37 @@ fn main() {
             vec![[0,-1],[1,0]],
         ],
     };
-    let A = ndarray::array![[true,true,true,false],[false,false,false,true],[true,false,false,false],[false,false,false,false]] as Array2<bool>;
-    let mut boot = ProcessoBootstrap{
-        tabuleiro: A,
-        fam_update: FAMILIA_UPDATE,
-        n: 4,
-        t: 0,
-        config_final: false,
-    };
-    boot.fazer_imagens("teste serial", false);
-    let FAMILIA_UPDATE: FamiliaUpdate = FamiliaUpdate{
-        v: vec![
-            vec![[1,0],[0,1]],
-            vec![[0,1],[-1,0]],
-            vec![[-1,0],[0,-1]],
-            vec![[0,-1],[1,0]],
-        ],
-    };
-    // let A = gerar_estado_inicial(0.2,8,8);
-    let A = ndarray::array![[true,true,true,false],[false,false,false,true],[true,false,false,false],[false,false,false,false]] as Array2<bool>;
-    let mut boot = BootstrapMod2Neighbor {
-        processo_bootstrap:ProcessoBootstrap{
-        tabuleiro: A,
-        fam_update: FAMILIA_UPDATE,
-        n: 4,
-        t: 0,
-        config_final: false,
-    }};
-    boot.processo_bootstrap.plotar("DC - antes");
-    boot.resolver_total();
-    boot.processo_bootstrap.plotar("DC - depois")
+    //
+    // let A = ndarray::array![[true,true,true,false],[false,false,false,true],[true,false,false,false],[false,false,false,false]] as Array2<bool>;
+    // let mut boot = ProcessoBootstrap{
+    //     tabuleiro: A,
+    //     fam_update: FAMILIA_UPDATE,
+    //     n: 4,
+    //     t: 0,
+    //     config_final: false,
+    // };
+    // boot.fazer_imagens("teste serial", false);
+    // let FAMILIA_UPDATE: FamiliaUpdate = FamiliaUpdate{
+    //     v: vec![
+    //         vec![[1,0],[0,1]],
+    //         vec![[0,1],[-1,0]],
+    //         vec![[-1,0],[0,-1]],
+    //         vec![[0,-1],[1,0]],
+    //     ],
+    // };
+    // // let A = gerar_estado_inicial(0.2,8,8);
+    // let A = ndarray::array![[true,true,true,false],[false,false,false,true],[true,false,false,false],[false,false,false,false]] as Array2<bool>;
+    // let mut boot = BootstrapMod2Neighbor {
+    //     processo_bootstrap:ProcessoBootstrap{
+    //     tabuleiro: A,
+    //     fam_update: FAMILIA_UPDATE,
+    //     n: 4,
+    //     t: 0,
+    //     config_final: false,
+    // }};
+    // boot.processo_bootstrap.plotar("DC - antes");
+    // boot.resolver_total();
+    // boot.processo_bootstrap.plotar("DC - depois")
 
 
 }
