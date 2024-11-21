@@ -1,12 +1,12 @@
 use std::cmp::{max, min};
 use std::collections::HashSet;
 use rand::random;
-use ndarray::{range, Array2, ErrorKind, ShapeError};
+use ndarray::{ Array2, ErrorKind, ShapeError};
 use ndarray;
 use plotters::prelude::*;
 use std::sync::{mpsc,};
 use crossbeam;
-use Algoritmos::tabela_chave_valor::ConjuntoIteravel;
+use std::time::Instant;
 
 const ALTURA:u32 = 1050;
 const LARGURA:u32 = 1680;
@@ -105,6 +105,7 @@ struct FamiliaUpdate {
     v: Vec<Vec<[i32;2]>>
 }
 
+#[derive(Clone)]
 struct ProcessoBootstrap {
     // tabuleiro: Vec<bool>,
     tabuleiro: Array2<bool>,
@@ -197,11 +198,11 @@ impl ProcessoBootstrap {
             .configure_mesh()
             // .x_labels(15)
             // .y_labels(15)
-            // .max_light_lines(31)
+            .max_light_lines(self.n-1)
             .light_line_style(ShapeStyle{
                 color: BLACK.into(),
                 filled:false,
-                stroke_width: 5
+                stroke_width: 3
             })
 
             // .x_label_offset(35)
@@ -223,8 +224,8 @@ impl ProcessoBootstrap {
                     Rectangle::new(
                         [(x, y), (x + 1, y + 1)],
                         match v {
-                            true =>     RGBAColor(150,150,150,1.0),
-                            false =>    RGBAColor(255,255,255,1.0),
+                            true =>     RGBAColor(150,150,150,0.5),
+                            false =>    RGBAColor(255,255,255,0.5),
                         }
                             .filled()
                     )
@@ -250,11 +251,19 @@ impl ProcessoBootstrap {
     fn resolver_total(self: &mut Self, n_threads: usize) {
 
         while !self.config_final {
-            println!("Passo t={}", self.t);
             if n_threads==1 { self.atualiza_passo() }
             else { self.passo_paralelo(n_threads) }
         }
-        println!("Chegamos à configuração final após {} iterações", self.t-1);
+    }
+
+    fn contar_infectados(self: &Self) -> u64 {
+        let mut cont:u64 = 0;
+        for i in 0..self.n{
+            for j in 0..self.n {
+                if self.tabuleiro[[i,j]] {cont+=1}
+            }
+        }
+        cont
     }
 }
 #[derive(PartialEq)]
@@ -356,7 +365,6 @@ impl ColecaoRetangulos {
         //Agora é preciso passar para o conjunto de novos retângulos todos aqueles que sobraram em self e em other
         for ret in self.conjunto.into_iter() {novos_retangulos.inserir(ret)};
         for ret in other.conjunto.into_iter() {novos_retangulos.inserir(ret)};
-        println!("limites = {:?} \t tamanho = {}",novos_retangulos.limites, novos_retangulos.conjunto.len());
         novos_retangulos
     }
 }
@@ -493,12 +501,138 @@ fn teste_metodos() {
 
 }
 
+fn gerar_gif(familia_update: &FamiliaUpdate, nome:&str) {
+    let n = 32;
+    for p in [0.05, 0.1, 0.15, 0.2, 0.25, 0.3] {
+        let A = gerar_estado_inicial(p, n, n);
+        let mut boot_serial = ProcessoBootstrap{
+            tabuleiro: A.clone(),
+            fam_update: familia_update.clone(),
+            n,
+            t: 0,
+            config_final: false,
+        };
+        let path = format!("{} n={} p={}", nome,n,p);
+        boot_serial.fazer_imagens(path.as_str(),false);
+    }
+}
+
+fn tabela_p_infectados(familia_update: &FamiliaUpdate, n: usize, nome: &str) {
+    //Cria uma tabela relacionando a probabilidade p com o numero de celulas infectadas na configuracao final
+    let mut resultados = Vec::<(f64,u64,u64)>::new();
+    for p_1000 in (1..100){
+        let p = (p_1000 as f64)/1000.;
+        println!("p = {}",p);
+        let mut boot = ProcessoBootstrap{
+            tabuleiro: gerar_estado_inicial(p,n,n),
+            fam_update: familia_update.clone(),
+            n: n,
+            t: 0,
+            config_final: false,
+        };
+        let infectados_inicial = boot.contar_infectados();
+        boot.resolver_total(8);
+        resultados.push((p, infectados_inicial, boot.contar_infectados()));
+    }
+    let path = format!("Output/tabela_infectados/{nome}.csv");
+    let mut writer = csv::Writer::from_path(path).unwrap();
+    writer.write_record(["p","inicial","infectados"]);
+    for (a,b,c) in resultados.iter() {
+        writer.write_record([a.to_string(), b.to_string(), c.to_string()]).unwrap();
+    }
+    writer.flush().unwrap();
+}
+
+fn tabela_tempo(p:f64, nome:&str) {
+    //Pega todos os métodos e mede o tempo para calcular o estado final, para os mesmos tabuleiros de valores diferentes de n
+    //Considera o bootstrap original e o modificado. No caso deste, compara também com o método dividir e conquistar
+    let expoente_maximo = 14;
+    //Parte 1: modelo bootstrap original
+    println!("Problema original");
+    let path = format!("Output/tabela_tempo/{} p={} -original.csv",nome,p);
+    let mut writer = csv::Writer::from_path(path).unwrap();
+    writer.write_record(["n","t_serial","t_paralelo"]);
+    for expoente in 1..=expoente_maximo {
+        let n = 2_usize.pow(expoente);
+        println!("n = {}",n);
+        let A = gerar_estado_inicial(p, n, n,);
+        let U_2N: FamiliaUpdate = FamiliaUpdate{
+            v: vec![
+                vec![[1,0],[0,1]],
+                vec![[0,1],[-1,0]],
+                vec![[-1,0],[0,-1]],
+                vec![[0,-1],[1,0]],
+                vec![[0,1],[0,-1]],
+                vec![[1,0],[-1,0]],
+            ],
+        };
+        let mut serial = ProcessoBootstrap{
+            tabuleiro: A.clone(),
+            fam_update: U_2N.clone(),
+            n,
+            t: 0,
+            config_final: false,
+        };
+        let mut paralelo = serial.clone();
+        let t0=Instant::now();
+        serial.resolver_total(1);
+        let t1 = Instant::now();
+        paralelo.resolver_total(8);
+        let t2=Instant::now();
+        let dt_serial = (t1-t0).as_secs_f64();
+        let dt_paralelo = (t2-t1).as_secs_f64();
+        assert_eq!(serial.tabuleiro,paralelo.tabuleiro);
+        writer.write_record([n.to_string(),dt_serial.to_string(),dt_paralelo.to_string()]).unwrap();
+    }
+    writer.flush().unwrap();
+
+    //Parte 2: problema de 2 vizinhos modificado
+    println!("Problema modificado");
+    let path = format!("Output/tabela_tempo/{} p={} -modificado.csv",nome,p);
+    let mut writer = csv::Writer::from_path(path).unwrap();
+    writer.write_record(["n","t_serial","t_paralelo","t_dc"]);
+    for expoente in 1..=expoente_maximo {
+        let n = 2_usize.pow(expoente);
+        println!("n = {}",n);
+        let A = gerar_estado_inicial(p, n, n,);
+        let U_MOD_2N: FamiliaUpdate = FamiliaUpdate{
+            v: vec![
+                vec![[1,0],[0,1]],
+                vec![[0,1],[-1,0]],
+                vec![[-1,0],[0,-1]],
+                vec![[0,-1],[1,0]],
+            ],
+        };
+        let mut serial = ProcessoBootstrap{
+            tabuleiro: A.clone(),
+            fam_update: U_MOD_2N.clone(),
+            n,
+            t: 0,
+            config_final: false,
+        };
+        let mut paralelo = serial.clone();
+        let mut div_con = BootstrapMod2Neighbor{
+            processo_bootstrap: serial.clone(),
+        };
+        let t0=Instant::now();
+        serial.resolver_total(1);
+        let t1 = Instant::now();
+        paralelo.resolver_total(8);
+        let t2=Instant::now();
+        div_con.resolver_total();
+        let t3 = Instant::now();
+        let dt_serial = (t1-t0).as_secs_f64();
+        let dt_paralelo = (t2-t1).as_secs_f64();
+        let dt_dc = (t3-t2).as_secs_f64();
+        writer.write_record([n.to_string(),dt_serial.to_string(),dt_paralelo.to_string(), dt_dc.to_string()]).unwrap();
+    }
+    writer.flush().unwrap();
+}
 
 fn main() {
-    teste_metodos();
+    // teste_metodos();
 
-
-    let FAMILIA_UPDATE: FamiliaUpdate = FamiliaUpdate{
+    let U_MOD_2N: FamiliaUpdate = FamiliaUpdate{
         v: vec![
             vec![[1,0],[0,1]],
             vec![[0,1],[-1,0]],
@@ -506,37 +640,29 @@ fn main() {
             vec![[0,-1],[1,0]],
         ],
     };
-    //
-    // let A = ndarray::array![[true,true,true,false],[false,false,false,true],[true,false,false,false],[false,false,false,false]] as Array2<bool>;
-    // let mut boot = ProcessoBootstrap{
-    //     tabuleiro: A,
-    //     fam_update: FAMILIA_UPDATE,
-    //     n: 4,
-    //     t: 0,
-    //     config_final: false,
-    // };
-    // boot.fazer_imagens("teste serial", false);
-    // let FAMILIA_UPDATE: FamiliaUpdate = FamiliaUpdate{
-    //     v: vec![
-    //         vec![[1,0],[0,1]],
-    //         vec![[0,1],[-1,0]],
-    //         vec![[-1,0],[0,-1]],
-    //         vec![[0,-1],[1,0]],
-    //     ],
-    // };
-    // // let A = gerar_estado_inicial(0.2,8,8);
-    // let A = ndarray::array![[true,true,true,false],[false,false,false,true],[true,false,false,false],[false,false,false,false]] as Array2<bool>;
-    // let mut boot = BootstrapMod2Neighbor {
-    //     processo_bootstrap:ProcessoBootstrap{
-    //     tabuleiro: A,
-    //     fam_update: FAMILIA_UPDATE,
-    //     n: 4,
-    //     t: 0,
-    //     config_final: false,
-    // }};
-    // boot.processo_bootstrap.plotar("DC - antes");
-    // boot.resolver_total();
-    // boot.processo_bootstrap.plotar("DC - depois")
+    let U_2N: FamiliaUpdate = FamiliaUpdate{
+        v: vec![
+        vec![[1,0],[0,1]],
+        vec![[0,1],[-1,0]],
+        vec![[-1,0],[0,-1]],
+        vec![[0,-1],[1,0]],
+        vec![[0,1],[0,-1]],
+        vec![[1,0],[-1,0]],
+        ],
+    };
+
+    gerar_gif(&U_2N, "Bootstrap 2");
+    gerar_gif(&U_MOD_2N, "Bootstrap Modificado");
+
+    tabela_p_infectados(&U_2N, 512, "original n=512");
+    tabela_p_infectados(&U_MOD_2N, 512, "modificado n=512");
+
+    tabela_tempo(0.1, "p=0.1");
+
+
+
+
+
 
 
 }
